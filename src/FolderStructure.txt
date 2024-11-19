@@ -1,0 +1,45 @@
+Folder PATH listing for volume Acer
+Volume serial number is 6EF5-9A75
+C:.
+¦   App.tsx
+¦   directory_structure.txt
+¦   FolderStructure.txt
+¦   index.css
+¦   main.tsx
+¦   vite-env.d.ts
+¦   
++---components
+¦   ¦   Calendar.tsx
+¦   ¦   DomainSelector.tsx
+¦   ¦   Header.tsx
+¦   ¦   Sidebar.tsx
+¦   ¦   UpcomingTasks.tsx
+¦   ¦   
+¦   +---conversations
+¦   ¦       ConversationList.tsx
+¦   ¦       FilterBar.tsx
+¦   ¦       
+¦   +---dashboard
+¦           PlanUsage.tsx
+¦           RecentTransactions.tsx
+¦           StatsCard.tsx
+¦           
++---context
+¦       DomainContext.tsx
+¦       
++---hooks
+¦       useClickOutside.ts
+¦       
++---lib
+¦       supabase.ts
+¦       
++---pages
+¦       Auth.tsx
+¦       Conversations.tsx
+¦       Dashboard.tsx
+¦       Domain.tsx
+¦       Settings.tsx
+¦       
++---store
+        authStore.ts
+        
