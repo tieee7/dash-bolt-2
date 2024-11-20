@@ -81,6 +81,9 @@ export default function ChatbotPreview({
                 <Send className="h-5 w-5" />
               </button>
             </div>
+            <div className="text-center mt-2">
+              <span className="text-xs text-gray-400">Powered by Corinna.ai</span>
+            </div>
           </div>
         </div>
       )}
