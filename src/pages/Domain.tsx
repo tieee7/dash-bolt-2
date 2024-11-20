@@ -3,6 +3,7 @@ import { Copy, Check, Code2, Globe, Save } from 'lucide-react';
 import { HexColorPicker } from 'react-colorful';
 import { toast } from 'react-hot-toast';
 import { useDomain } from '../context/DomainContext';
+import ChatbotPreview from '../components/ChatbotPreview';
 
 export default function Domain() {
   const { currentDomain, updateDomainName } = useDomain();
@@ -26,6 +27,8 @@ export default function Domain() {
   const [newTrainingData, setNewTrainingData] = useState('');
   const [trainingSearchQuery, setTrainingSearchQuery] = useState('');
   const [editingTrainingId, setEditingTrainingId] = useState<number | null>(null);
+  const [newQuestion, setNewQuestion] = useState('');
+  const [newAnswer, setNewAnswer] = useState('');
 
   useEffect(() => {
     setDomainName(currentDomain.name);
@@ -50,7 +53,6 @@ export default function Domain() {
       return;
     }
     
-    // Basic domain name validation
     const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$/;
     if (!domainRegex.test(domainName)) {
       toast.error('Please enter a valid domain name');
@@ -63,13 +65,11 @@ export default function Domain() {
   };
 
   const handleSaveAll = () => {
-    // Validate and update domain name without showing its own toast
     if (!domainName.trim()) {
       toast.error('Domain name cannot be empty');
       return;
     }
     
-    // Basic domain name validation
     const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$/;
     if (!domainRegex.test(domainName)) {
       toast.error('Please enter a valid domain name');
@@ -78,9 +78,31 @@ export default function Domain() {
 
     updateDomainName(domainName);
     setIsEditing(false);
-    
-    // Show only one success toast for all changes
     toast.success('All changes saved successfully');
+  };
+
+  const handleAddQA = () => {
+    if (!newQuestion.trim() || !newAnswer.trim()) {
+      toast.error('Both question and answer are required');
+      return;
+    }
+
+    setQaList([
+      ...qaList,
+      {
+        id: Date.now(),
+        question: newQuestion.trim(),
+        answer: newAnswer.trim()
+      }
+    ]);
+    setNewQuestion('');
+    setNewAnswer('');
+    toast.success('FAQ added successfully');
+  };
+
+  const handleDeleteQA = (id: number) => {
+    setQaList(qaList.filter(qa => qa.id !== id));
+    toast.success('FAQ deleted successfully');
   };
 
   const filteredQA = qaList.filter(qa => 
@@ -257,7 +279,7 @@ export default function Domain() {
             {/* Left side - Input Form */}
             <div className="bg-white rounded-lg shadow p-6">
               <p className="text-gray-600 mb-6">
-                Set up FAQs
+                Set up FAQs for your chatbot to answer common questions
               </p>
               
               <div className="space-y-4">
@@ -268,6 +290,8 @@ export default function Domain() {
                   <input
                     type="text"
                     id="question"
+                    value={newQuestion}
+                    onChange={(e) => setNewQuestion(e.target.value)}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                     placeholder="Enter a question"
                   />
@@ -279,6 +303,8 @@ export default function Domain() {
                   </label>
                   <textarea
                     id="answer"
+                    value={newAnswer}
+                    onChange={(e) => setNewAnswer(e.target.value)}
                     rows={4}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
                     placeholder="Enter the answer"
@@ -287,9 +313,10 @@ export default function Domain() {
 
                 <div className="flex justify-end">
                   <button
+                    onClick={handleAddQA}
                     className="bg-orange-500 text-white px-6 py-2 rounded-lg hover:bg-orange-600 transition-colors"
                   >
-                    Create
+                    Add FAQ
                   </button>
                 </div>
               </div>
@@ -307,31 +334,21 @@ export default function Domain() {
                 />
               </div>
 
-              <div className="space-y-4 max-h-[600px] overflow-y-auto">
+              <div className="space-y-4 max-h-[400px] overflow-y-auto">
                 {filteredQA.map((qa) => (
                   <div key={qa.id} className="border rounded-lg p-4 hover:border-orange-200 transition-colors">
                     <div className="flex justify-between items-start mb-2">
                       <h4 className="font-medium text-gray-900">{qa.question}</h4>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setEditingId(qa.id)}
-                          className="text-gray-600 hover:text-orange-500"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => setQaList(qaList.filter(item => item.id !== qa.id))}
-                          className="text-gray-600 hover:text-red-500"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                          </svg>
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => handleDeleteQA(qa.id)}
+                        className="text-gray-400 hover:text-red-500"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                      </button>
                     </div>
-                    <p className="text-gray-600 text-sm">{qa.answer}</p>
+                    <p className="text-sm text-gray-600">{qa.answer}</p>
                   </div>
                 ))}
               </div>
@@ -377,11 +394,8 @@ export default function Domain() {
                         toast.success('Training data added successfully');
                       }
                     }}
-                    className="bg-orange-500 text-white px-6 py-2 rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2"
+                    className="bg-orange-500 text-white px-6 py-2 rounded-lg hover:bg-orange-600 transition-colors"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-                    </svg>
                     Add Training Data
                   </button>
                 </div>
@@ -400,7 +414,7 @@ export default function Domain() {
                 />
               </div>
 
-              <div className="space-y-4 max-h-[600px] overflow-y-auto">
+              <div className="space-y-4 max-h-[400px] overflow-y-auto">
                 {filteredTrainingData.map((data) => (
                   <div key={data.id} className="border rounded-lg p-4 hover:border-orange-200 transition-colors">
                     <div className="flex justify-between items-start mb-2">
@@ -409,29 +423,19 @@ export default function Domain() {
                           {data.type}
                         </span>
                       </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setEditingTrainingId(data.id)}
-                          className="text-gray-600 hover:text-orange-500"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => {
-                            setTrainingData(trainingData.filter(item => item.id !== data.id));
-                            toast.success('Training data removed');
-                          }}
-                          className="text-gray-600 hover:text-red-500"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                          </svg>
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => {
+                          setTrainingData(trainingData.filter(item => item.id !== data.id));
+                          toast.success('Training data removed');
+                        }}
+                        className="text-gray-400 hover:text-red-500"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                      </button>
                     </div>
-                    <p className="text-gray-600 text-sm whitespace-pre-wrap">{data.content}</p>
+                    <p className="text-sm text-gray-600 whitespace-pre-wrap">{data.content}</p>
                   </div>
                 ))}
               </div>
@@ -450,6 +454,14 @@ export default function Domain() {
           </button>
         </div>
       </div>
+
+      {/* Chatbot Preview */}
+      <ChatbotPreview
+        chatbotName={chatbotName}
+        greetingMessage={greetingMessage}
+        color={color}
+        domainName={domainName}
+      />
     </div>
   );
 }
