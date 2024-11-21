@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Camera, CreditCard, Calendar, Download, LogOut, Save } from 'lucide-react';
 import { toast, Toaster } from 'react-hot-toast';
+import { supabase } from '../lib/supabase'; // Import your supabase client
 
 interface Plan {
   id: string;
@@ -41,11 +42,36 @@ const transactions = [
 ];
 
 export default function Settings() {
-  const [name, setName] = useState('Mike Woz');
-  const [email, setEmail] = useState('mike@example.com');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [company, setCompany] = useState('Acme Inc');
   const [avatar, setAvatar] = useState('https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('full_name, username')
+          .eq('id', user.id)
+          .single();
+
+        if (data) {
+          setName(data.full_name);
+          setUsername(data.username);
+        } else if (error) {
+          console.error('Error fetching user profile:', error);
+        }
+
+        setEmail(user.email);
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
 
   const handleAvatarClick = () => {
     fileInputRef.current?.click();
@@ -63,8 +89,30 @@ export default function Settings() {
     }
   };
 
-  const handleSaveProfile = () => {
-    toast.success('Profile updated successfully');
+  
+
+  const handleSaveProfile = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) return;
+  
+    const { error } = await supabase
+      .from('profiles')
+      .upsert({
+        id: user.id,
+        full_name: name,
+        username: user.email?.split('@')[0], // Ensure this matches 'unique not null' constraint
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'id'
+      });
+  
+    if (error) {
+      console.error('Error details:', error);
+      toast.error('Failed to save name');
+    } else {
+      toast.success('Profile updated');
+    }
   };
 
   const handlePlanChange = (planId: string) => {
@@ -151,6 +199,19 @@ export default function Settings() {
                   id="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
+                  Username
+                </label>
+                <input
+                  type="text"
+                  id="username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
               </div>
