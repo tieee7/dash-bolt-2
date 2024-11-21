@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Mail, Clock, ChevronDown, X, Star, Trash2, Eye, EyeOff } from 'lucide-react';
+import { Mail, Clock, ChevronDown, X, Star, Trash2, Eye, EyeOff, Send } from 'lucide-react';
 import ConversationList from '../components/conversations/ConversationList';
 import FilterBar from '../components/conversations/FilterBar';
 import { useClickOutside } from '../hooks/useClickOutside';
@@ -10,6 +10,14 @@ interface Message {
   text: string;
   sender: 'user' | 'bot';
   timestamp: string;
+}
+
+interface Conversation {
+  id: string;
+  email: string;
+  message: string;
+  date?: string;
+  time?: string;
 }
 
 const initialFilters = [
@@ -91,6 +99,9 @@ export default function Conversations() {
   const [isRead, setIsRead] = useState(true);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [messages, setMessages] = useState(sampleMessages);
+  const [newMessage, setNewMessage] = useState('');
+  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Refs for dropdown menus
   const filtersRef = useRef<HTMLDivElement>(null);
@@ -103,6 +114,10 @@ export default function Conversations() {
   useClickOutside(tagsRef, () => setOpenFilter(''), openFilter === 'tags');
   useClickOutside(priorityRef, () => setOpenFilter(''), openFilter === 'priority');
   useClickOutside(statusRef, () => setOpenFilter(''), openFilter === 'status');
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   const handleFilterToggle = (filter: string) => {
     setOpenFilter(prev => prev === filter ? '' : filter);
@@ -124,12 +139,42 @@ export default function Conversations() {
 
   const handleDeleteConversation = () => {
     setMessages([]);
+    setSelectedConversation(null);
     toast.success('Conversation deleted successfully');
   };
 
   const handleReadToggle = () => {
     setIsRead(!isRead);
     toast.success(`Conversation marked as ${isRead ? 'unread' : 'read'}`);
+  };
+
+  const handleSendMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMessage.trim()) return;
+
+    const newMsg: Message = {
+      id: Date.now().toString(),
+      text: newMessage.trim(),
+      sender: 'user',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
+    setMessages(prev => [...prev, newMsg]);
+    setNewMessage('');
+    
+    // Simulate bot response
+    setTimeout(() => {
+      const botResponse: Message = {
+        id: (Date.now() + 1).toString(),
+        text: "Thanks for your message! I'll get back to you shortly.",
+        sender: 'bot',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setMessages(prev => [...prev, botResponse]);
+      scrollToBottom();
+    }, 1000);
+
+    scrollToBottom();
   };
 
   const getDropdownRef = (filter: string) => {
@@ -215,14 +260,19 @@ export default function Conversations() {
             )}
           </div>
         </div>
-        <ConversationList />
+        <ConversationList 
+          onSelectConversation={setSelectedConversation}
+          selectedId={selectedConversation?.id}
+        />
       </div>
 
       {/* Right Panel */}
       <div className="flex-1 flex flex-col">
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-2xl font-bold">Support Conversation</h1>
+            <h1 className="text-2xl font-bold">
+              {selectedConversation ? selectedConversation.email : 'Support Conversation'}
+            </h1>
             <div className="flex items-center gap-3">
               <button
                 onClick={handleReadToggle}
@@ -334,22 +384,30 @@ export default function Conversations() {
                 </div>
               </div>
             ))}
+            <div ref={messagesEndRef} />
           </div>
         </div>
 
         {/* Message Input */}
-        <div className="p-4 border-t border-gray-200">
+        <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200">
           <div className="flex gap-2">
             <input
               type="text"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
               placeholder="Type your message..."
               className="flex-1 p-3 bg-gray-50 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900"
             />
-            <button className="px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800">
+            <button 
+              type="submit"
+              className="px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={!newMessage.trim()}
+            >
+              <Send className="h-5 w-5" />
               Send
             </button>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   );
