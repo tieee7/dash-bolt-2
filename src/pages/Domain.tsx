@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Copy, Check, Code2, Globe, Save } from 'lucide-react';
 import { HexColorPicker } from 'react-colorful';
 import { toast } from 'react-hot-toast';
@@ -29,10 +29,31 @@ export default function Domain() {
   const [editingTrainingId, setEditingTrainingId] = useState<number | null>(null);
   const [newQuestion, setNewQuestion] = useState('');
   const [newAnswer, setNewAnswer] = useState('');
+  const [headerTextColor, setHeaderTextColor] = useState('#000000');
+  const [showHeaderColorPicker, setShowHeaderColorPicker] = useState(false);
+
+  const colorPickerRef = useRef<HTMLDivElement>(null);
+  const headerColorPickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setDomainName(currentDomain.name);
   }, [currentDomain.name]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (colorPickerRef.current && !colorPickerRef.current.contains(event.target as Node)) {
+        setShowColorPicker(false);
+      }
+      if (headerColorPickerRef.current && !headerColorPickerRef.current.contains(event.target as Node)) {
+        setShowHeaderColorPicker(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const integrationCode = `<script src="https://chatbot.corinna.ai/widget/${currentDomain.name}"></script>`;
 
@@ -253,18 +274,50 @@ export default function Domain() {
             {/* Chatbot Color */}
             <div className="bg-white rounded-lg shadow p-6">
               <h3 className="text-lg font-semibold mb-4">Chatbot Color</h3>
-              <div className="relative">
+              <div className="relative" ref={colorPickerRef}>
                 <div className="flex items-center gap-4 mb-4">
                   <button
                     onClick={() => setShowColorPicker(!showColorPicker)}
                     className="w-10 h-10 rounded-lg border shadow-sm"
                     style={{ backgroundColor: color }}
                   />
-                  <span className="text-gray-600">{color}</span>
+                  <input
+                    type="text"
+                    value={color}
+                    onChange={(e) => setColor(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    placeholder="Enter color code (e.g., #FF6B00)"
+                  />
                 </div>
                 {showColorPicker && (
                   <div className="absolute z-10">
                     <HexColorPicker color={color} onChange={setColor} />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Header Text Color - New Section */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold mb-4">Header Text Color</h3>
+              <div className="relative" ref={headerColorPickerRef}>
+                <div className="flex items-center gap-4 mb-4">
+                  <button
+                    onClick={() => setShowHeaderColorPicker(!showHeaderColorPicker)}
+                    className="w-10 h-10 rounded-lg border shadow-sm"
+                    style={{ backgroundColor: headerTextColor }}
+                  />
+                  <input
+                    type="text"
+                    value={headerTextColor}
+                    onChange={(e) => setHeaderTextColor(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    placeholder="Enter header text color code (e.g., #000000)"
+                  />
+                </div>
+                {showHeaderColorPicker && (
+                  <div className="absolute z-10">
+                    <HexColorPicker color={headerTextColor} onChange={setHeaderTextColor} />
                   </div>
                 )}
               </div>
@@ -461,6 +514,7 @@ export default function Domain() {
         greetingMessage={greetingMessage}
         color={color}
         domainName={domainName}
+        headerTextColor={headerTextColor}
       />
     </div>
   );
