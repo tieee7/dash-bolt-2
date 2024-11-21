@@ -6,15 +6,13 @@ interface ChatbotPreviewProps {
   greetingMessage: string;
   color: string;
   domainName: string;
-  headerTextColor: string;
 }
 
 export default function ChatbotPreview({ 
   chatbotName, 
   greetingMessage, 
   color,
-  domainName,
-  headerTextColor
+  domainName 
 }: ChatbotPreviewProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [message, setMessage] = useState('');
@@ -32,7 +30,7 @@ export default function ChatbotPreview({
       {isExpanded && (
         <div className="mb-4 w-[380px] bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden">
           {/* Header */}
-          <div className="p-4 border-b flex items-center gap-3" style={{ backgroundColor: color }}>
+          <div className="p-4 border-b flex items-center gap-3">
             <div className="relative">
               <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
                 <span className="text-lg">🤖</span>
@@ -40,8 +38,8 @@ export default function ChatbotPreview({
               <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white" style={indicatorStyle}></div>
             </div>
             <div>
-              <h3 className="font-medium" style={{ color: headerTextColor }}>{chatbotName}</h3>
-              <p className="text-sm" style={{ color: headerTextColor }}>from {domainName}</p>
+              <h3 className="font-medium">{chatbotName}</h3>
+              <p className="text-sm text-gray-500">from {domainName}</p>
             </div>
           </div>
 
@@ -82,9 +80,6 @@ export default function ChatbotPreview({
               >
                 <Send className="h-5 w-5" />
               </button>
-            </div>
-            <div className="text-center mt-2">
-              <a href="https://corinna.ai" className="text-sm text-gray-600 hover:text-gray-700">Powered by Corinna.ai</a>
             </div>
           </div>
         </div>

@@ -24,7 +24,7 @@ const conversations: Conversation[] = [
     date: '8 Aug'
   },
   {
-    email: 'steven@gmail.com',
+    email: 'abdulboss14@gmail.com',
     message: "That's great to hear...",
     date: '9 Aug'
   },

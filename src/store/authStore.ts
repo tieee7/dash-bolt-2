@@ -27,25 +27,21 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   signUp: async (email: string, password: string, username: string) => {
-    // Sign up the user
     const { error: signUpError, data } = await supabase.auth.signUp({
       email,
       password,
     });
-  
     if (signUpError) throw signUpError;
-  
+
     if (data.user) {
-      // Insert profile with email and username into profiles table
       const { error: profileError } = await supabase
         .from('profiles')
-        .insert([{ id: data.user.id, username, email }]);  // Add email here
-  
+        .insert([{ id: data.user.id, username }]);
+      
       if (profileError) throw profileError;
       set({ user: data.user });
     }
   },
-  
 
   signOut: async () => {
     const { error } = await supabase.auth.signOut();
