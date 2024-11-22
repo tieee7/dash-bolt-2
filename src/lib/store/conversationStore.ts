@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '../supabase';
 import { Database } from '../database.types';
+import { toast } from 'react-hot-toast';
 
 type Conversation = Database['public']['Tables']['conversations']['Row'];
 type Message = Database['public']['Tables']['messages']['Row'];
@@ -43,6 +44,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       set({ conversations: data || [] });
     } catch (error: any) {
       set({ error: error.message });
+      toast.error('Failed to fetch conversations');
     } finally {
       set({ isLoading: false });
     }
@@ -61,6 +63,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       set({ messages: data || [] });
     } catch (error: any) {
       set({ error: error.message });
+      toast.error('Failed to fetch messages');
     } finally {
       set({ isLoading: false });
     }
@@ -78,6 +81,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       set({ tags: data || [] });
     } catch (error: any) {
       set({ error: error.message });
+      toast.error('Failed to fetch tags');
     } finally {
       set({ isLoading: false });
     }
@@ -113,6 +117,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       await get().fetchMessages(conversationId);
     } catch (error: any) {
       set({ error: error.message });
+      toast.error('Failed to send message');
     } finally {
       set({ isLoading: false });
     }
@@ -141,6 +146,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       return data.id;
     } catch (error: any) {
       set({ error: error.message });
+      toast.error('Failed to create conversation');
       throw error;
     } finally {
       set({ isLoading: false });
@@ -159,6 +165,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       await get().fetchConversations();
     } catch (error: any) {
       set({ error: error.message });
+      toast.error('Failed to update conversation');
     } finally {
       set({ isLoading: false });
     }
@@ -172,8 +179,10 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         .insert({ conversation_id: conversationId, tag_id: tagId });
 
       if (error) throw error;
+      toast.success('Tag added successfully');
     } catch (error: any) {
       set({ error: error.message });
+      toast.error('Failed to add tag');
     } finally {
       set({ isLoading: false });
     }
@@ -189,8 +198,10 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         .eq('tag_id', tagId);
 
       if (error) throw error;
+      toast.success('Tag removed successfully');
     } catch (error: any) {
       set({ error: error.message });
+      toast.error('Failed to remove tag');
     } finally {
       set({ isLoading: false });
     }
