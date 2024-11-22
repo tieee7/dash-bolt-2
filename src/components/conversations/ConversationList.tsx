@@ -1,58 +1,34 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { User } from 'lucide-react';
-
-interface Conversation {
-  id: string;
-  email: string;
-  message: string;
-  date?: string;
-  time?: string;
-}
-
-const conversations: Conversation[] = [
-  {
-    id: '1',
-    email: 'test.123@gmail.com',
-    message: 'This chatroom is empty',
-  },
-  {
-    id: '2',
-    email: 'jimmmy.11@gmail.com',
-    message: 'aaaaaaaaaaaaaaaaaaaaa...',
-    date: '9 Aug'
-  },
-  {
-    id: '3',
-    email: 'jooepo44@gmail.com',
-    message: "That's great to hear...",
-    date: '8 Aug'
-  },
-  {
-    id: '4',
-    email: 'steven@gmail.com',
-    message: "That's great to hear...",
-    date: '9 Aug'
-  },
-  {
-    id: '5',
-    email: 'test44@gmail.com',
-    message: 'Fantastic! In order ...',
-    time: '12:5AM'
-  }
-];
+import { useConversationStore } from '../../lib/store/conversationStore';
+import { formatDistanceToNow } from 'date-fns';
 
 interface ConversationListProps {
-  onSelectConversation: (conversation: Conversation) => void;
+  onSelectConversation: (conversationId: string) => void;
   selectedId?: string;
 }
 
 export default function ConversationList({ onSelectConversation, selectedId }: ConversationListProps) {
+  const { conversations, fetchConversations, isLoading } = useConversationStore();
+
+  useEffect(() => {
+    fetchConversations();
+  }, [fetchConversations]);
+
+  if (isLoading && conversations.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 overflow-y-auto">
       {conversations.map((conversation) => (
         <button
           key={conversation.id}
-          onClick={() => onSelectConversation(conversation)}
+          onClick={() => onSelectConversation(conversation.id)}
           className={`w-full flex items-start gap-3 p-4 hover:bg-gray-50 border-b border-gray-100 text-left transition-colors ${
             selectedId === conversation.id ? 'bg-gray-50' : ''
           }`}
@@ -62,14 +38,18 @@ export default function ConversationList({ onSelectConversation, selectedId }: C
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex justify-between items-center mb-1">
-              <span className="font-medium text-gray-900">{conversation.email}</span>
-              {(conversation.date || conversation.time) && (
+              <span className="font-medium text-gray-900">
+                {conversation.title || 'New Conversation'}
+              </span>
+              {conversation.last_message_at && (
                 <span className="text-sm text-gray-500">
-                  {conversation.date || conversation.time}
+                  {formatDistanceToNow(new Date(conversation.last_message_at), { addSuffix: true })}
                 </span>
               )}
             </div>
-            <p className="text-sm text-gray-600 truncate">{conversation.message}</p>
+            {!conversation.is_read && (
+              <span className="inline-block w-2 h-2 bg-orange-500 rounded-full mb-1"></span>
+            )}
           </div>
         </button>
       ))}
