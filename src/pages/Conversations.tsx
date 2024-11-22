@@ -50,6 +50,8 @@ export default function Conversations() {
     status: [],
     priority: [],
   });
+
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const { updateConversation, currentConversation } = useConversationStore();
 
@@ -114,6 +116,21 @@ export default function Conversations() {
       });
     } catch (error) {
       toast.error('Failed to update conversation');
+    }
+  };
+
+  const getDropdownRef = (filter: string) => {
+    switch (filter) {
+      case 'filters':
+        return filtersRef;
+      case 'tags':
+        return tagsRef;
+      case 'priority':
+        return priorityRef;
+      case 'status':
+        return statusRef;
+      default:
+        return null;
     }
   };
 
@@ -228,6 +245,66 @@ export default function Conversations() {
                   </button>
                 </div>
               </div>
+
+               {/* Selected Tags Display */}
+          <div className="flex flex-wrap gap-2 mb-2">
+            {selectedTags.map(tag => (
+              <span
+                key={tag}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-gray-100"
+              >
+                {tag}
+                <X
+                  className="h-3 w-3 cursor-pointer"
+                  onClick={() => setSelectedTags(prev => prev.filter(t => t !== tag))}
+                />
+              </span>
+            ))}
+          </div>
+
+          {/* Filter Buttons Row */}
+          <div className="flex gap-2">
+            {['tags', 'priority', 'status'].map((filterType) => (
+              <div key={filterType} className="relative" ref={getDropdownRef(filterType)}>
+                <button
+                  onClick={() => handleFilterToggle(filterType)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm bg-gray-100 text-gray-600 hover:bg-gray-200"
+                >
+                  <span>{filterType.charAt(0).toUpperCase() + filterType.slice(1)}</span>
+                  <ChevronDown className="h-4 w-4" />
+                </button>
+
+                {openFilter === filterType && (
+                  <div className="absolute top-full left-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-10 w-48">
+                    <div className="p-2">
+                      {filterSections[filterType as keyof typeof filterSections].options.map((option) => (
+                        <button
+                          key={option.id}
+                          onClick={() => {
+                            setSelectedTags(prev => 
+                              prev.includes(option.id) 
+                                ? prev.filter(t => t !== option.id)
+                                : [...prev, option.id]
+                            );
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-lg text-sm ${
+                            selectedTags.includes(option.id)
+                              ? 'bg-gray-900 text-white'
+                              : 'hover:bg-gray-50'
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+
+
             </div>
 
             <MessageList conversationId={selectedConversationId} />
