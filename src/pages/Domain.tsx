@@ -1,9 +1,11 @@
+{/* Previous imports remain the same */}
 import React, { useState, useEffect, useRef } from 'react';
 import { Copy, Check, Code2, Globe, Save } from 'lucide-react';
 import { HexColorPicker } from 'react-colorful';
 import { toast } from 'react-hot-toast';
 import { useDomain } from '../context/DomainContext';
 import ChatbotPreview from '../components/ChatbotPreview';
+import { supabase } from '../lib/supabase';
 
 export default function Domain() {
   const { currentDomain, updateDomainName } = useDomain();
@@ -12,7 +14,7 @@ export default function Domain() {
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [copied, setCopied] = useState(false);
   const [greetingMessage, setGreetingMessage] = useState('👋 Hi there! How can I help you today?');
-  const [domainName, setDomainName] = useState(currentDomain.name);
+  const [domainName, setDomainName] = useState(currentDomain?.name || '');
   const [isEditing, setIsEditing] = useState(false);
   const [qaList, setQaList] = useState([
     { id: 1, question: "What are your business hours?", answer: "We're open Monday to Friday, 9 AM to 5 PM." },
@@ -36,8 +38,34 @@ export default function Domain() {
   const headerColorPickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setDomainName(currentDomain.name);
-  }, [currentDomain.name]);
+    setDomainName(currentDomain?.name || '');
+  }, [currentDomain?.name]);
+
+  // Fetch chatbot settings when domain changes
+  useEffect(() => {
+    const fetchChatbotSettings = async () => {
+      if (!currentDomain?.id) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('domain_settings')
+          .select('chatbot_name')
+          .eq('domain_id', currentDomain.id)
+          .single();
+
+        if (error) throw error;
+
+        if (data) {
+          setChatbotName(data.chatbot_name || 'Friendly Assistant');
+        }
+      } catch (error) {
+        console.error('Error fetching chatbot settings:', error);
+        toast.error('Failed to load chatbot settings');
+      }
+    };
+
+    fetchChatbotSettings();
+  }, [currentDomain?.id]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -55,7 +83,7 @@ export default function Domain() {
     };
   }, []);
 
-  const integrationCode = `<script src="https://chatbot.corinna.ai/widget/${currentDomain.name}"></script>`;
+  const integrationCode = `<script src="https://chatbot.corinna.ai/widget/${currentDomain?.name}"></script>`;
 
   const handleCopyCode = async () => {
     try {
@@ -85,7 +113,12 @@ export default function Domain() {
     toast.success('Domain name updated successfully');
   };
 
-  const handleSaveAll = () => {
+  const handleSaveAll = async () => {
+    if (!currentDomain?.id) {
+      toast.error('No domain selected');
+      return;
+    }
+
     if (!domainName.trim()) {
       toast.error('Domain name cannot be empty');
       return;
@@ -97,11 +130,30 @@ export default function Domain() {
       return;
     }
 
-    updateDomainName(domainName);
-    setIsEditing(false);
-    toast.success('All changes saved successfully');
+    try {
+      // Update domain settings
+      const { error: settingsError } = await supabase
+        .from('domain_settings')
+        .upsert({
+          domain_id: currentDomain.id,
+          chatbot_name: chatbotName,
+          greeting_message: greetingMessage,
+          color: color,
+          header_text_color: headerTextColor
+        });
+
+      if (settingsError) throw settingsError;
+
+      updateDomainName(domainName);
+      setIsEditing(false);
+      toast.success('All changes saved successfully');
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      toast.error('Failed to save changes');
+    }
   };
 
+  // Rest of the component remains the same...
   const handleAddQA = () => {
     if (!newQuestion.trim() || !newAnswer.trim()) {
       toast.error('Both question and answer are required');
@@ -177,7 +229,7 @@ export default function Domain() {
                       </button>
                       <button
                         onClick={() => {
-                          setDomainName(currentDomain.name);
+                          setDomainName(currentDomain?.name || '');
                           setIsEditing(false);
                         }}
                         className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
@@ -297,7 +349,7 @@ export default function Domain() {
               </div>
             </div>
 
-            {/* Header Text Color - New Section */}
+            {/* Header Text Color */}
             <div className="bg-white rounded-lg shadow p-6">
               <h3 className="text-lg font-semibold mb-4">Header Text Color</h3>
               <div className="relative" ref={headerColorPickerRef}>
