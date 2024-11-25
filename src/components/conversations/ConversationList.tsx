@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { User, Tag } from 'lucide-react';
 import { useConversationStore } from '../../lib/store/conversationStore';
+import { useDomain } from '../../context/DomainContext';
 import { formatDistanceToNow } from 'date-fns';
 
 interface ConversationListProps {
@@ -9,12 +10,24 @@ interface ConversationListProps {
 }
 
 export default function ConversationList({ onSelectConversation, selectedId }: ConversationListProps) {
-  const { conversations, fetchConversations, fetchTags, isLoading } = useConversationStore();
+  const { conversations, fetchConversations, isLoading, setCurrentDomainId } = useConversationStore();
+  const { currentDomain } = useDomain();
 
   useEffect(() => {
-    fetchConversations();
-    fetchTags();
-  }, [fetchConversations, fetchTags]);
+    if (currentDomain) {
+      setCurrentDomainId(currentDomain.id);
+    } else {
+      setCurrentDomainId(null);
+    }
+  }, [currentDomain, setCurrentDomainId]);
+
+  if (!currentDomain) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-gray-500">
+        <p>Please select a domain</p>
+      </div>
+    );
+  }
 
   if (isLoading && conversations.length === 0) {
     return (
@@ -54,16 +67,13 @@ export default function ConversationList({ onSelectConversation, selectedId }: C
                 )}
               </div>
               
-              {/* Tags */}
               {conversation.tags && conversation.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-1">
-                  {conversation.tags.filter(tag => tag && tag.color).map((tag) => (
+                  {conversation.tags.map((tag) => (
                     <span
                       key={tag.id}
                       className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs text-white"
-                      style={{
-                        backgroundColor: tag.color
-                      }}
+                      style={{ backgroundColor: tag.color }}
                     >
                       <Tag className="h-3 w-3" />
                       {tag.name}
