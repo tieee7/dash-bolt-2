@@ -6,7 +6,6 @@ import { toast } from 'react-hot-toast';
 type Conversation = Database['public']['Tables']['conversations']['Row'];
 type Message = Database['public']['Tables']['messages']['Row'];
 type Tag = Database['public']['Tables']['tags']['Row'];
-type ConversationTag = Database['public']['Tables']['conversation_tags']['Row'];
 
 interface ConversationStore {
   conversations: (Conversation & { tags?: Tag[] })[];
@@ -16,6 +15,8 @@ interface ConversationStore {
   selectedTags: string[];
   isLoading: boolean;
   error: string | null;
+  currentDomainId: string | null;
+  setCurrentDomainId: (domainId: string | null) => void;
   fetchConversations: () => Promise<void>;
   fetchMessages: (conversationId: string) => Promise<void>;
   fetchTags: () => Promise<void>;
@@ -43,16 +44,34 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
   isLoading: false,
   error: null,
   sortOrder: 'newest',
-  activeFilter: 'active' as 'active' | 'all' | 'urgent' | 'closed',
+  activeFilter: 'active',
+  currentDomainId: null,
+
+  setCurrentDomainId: (domainId: string | null) => {
+    set({ currentDomainId: domainId });
+    if (domainId) {
+      get().fetchConversations();
+    }
+  },
 
   setSelectedTags: (tags: string[]) => {
     set({ selectedTags: tags });
   },
 
   fetchConversations: async () => {
+    const { currentDomainId } = get();
+    if (!currentDomainId) {
+      set({ conversations: [] });
+      return;
+    }
+
     set({ isLoading: true, error: null });
     try {
-      const { selectedTags, sortOrder } = get();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const { selectedTags, sortOrder, activeFilter } = get();
+
       let query = supabase
         .from('conversations')
         .select(`
@@ -65,23 +84,33 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
             )
           )
         `)
-        .eq('status', 'active')
+        .eq('user_id', user.id)
+        .eq('domain_id', currentDomainId)
+        .neq('status', 'deleted')
         .order('last_message_at', { ascending: sortOrder === 'oldest' });
 
-      switch (get().activeFilter) {
+      // Apply filter based on activeFilter
+      switch (activeFilter) {
         case 'active':
-          query = query.eq('is_starred', false);
+          query = query.eq('status', 'active').eq('is_starred', false);
+          break;
+        case 'urgent':
+          query = query.eq('status', 'active').eq('is_starred', true);
           break;
         case 'closed':
-          query = query.eq('is_starred', true);
+          query = query.eq('status', 'archived');
           break;
+        // 'all' filter doesn't need additional conditions
       }
 
-      if (selectedTags.length > 0) {
-        const { data, error } = await query;
-        if (error) throw error;
+      const { data, error } = await query;
+      if (error) throw error;
 
-        const filteredConversations = data.filter(conv => {
+      let filteredConversations = data || [];
+
+      // Apply tag filtering if tags are selected
+      if (selectedTags.length > 0) {
+        filteredConversations = filteredConversations.filter(conv => {
           const convTags = conv.conversation_tags
             .map((ct: any) => ct.tags)
             .filter((tag: Tag | null): tag is Tag => tag !== null);
@@ -89,73 +118,20 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
             convTags.some(tag => tag.id === tagId)
           );
         });
-
-        set({ 
-          conversations: filteredConversations.map(conv => ({
-            ...conv,
-            tags: conv.conversation_tags
-              .map((ct: any) => ct.tags)
-              .filter((tag: Tag | null): tag is Tag => tag !== null)
-          }))
-        });
-      } else {
-        const { data, error } = await query;
-        if (error) throw error;
-
-        set({
-          conversations: (data || []).map(conv => ({
-            ...conv,
-            tags: conv.conversation_tags
-              .map((ct: any) => ct.tags)
-              .filter((tag: Tag | null): tag is Tag => tag !== null)
-          }))
-        });
       }
+
+      set({
+        conversations: filteredConversations.map(conv => ({
+          ...conv,
+          tags: conv.conversation_tags
+            .map((ct: any) => ct.tags)
+            .filter((tag: Tag | null): tag is Tag => tag !== null)
+        }))
+      });
     } catch (error: any) {
+      console.error('Error fetching conversations:', error);
       set({ error: error.message });
       toast.error('Failed to fetch conversations');
-    } finally {
-      set({ isLoading: false });
-    }
-  },
-
-  fetchConversationTags: async (conversationId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('conversation_tags')
-        .select(`
-          tags (
-            id,
-            name,
-            color
-          )
-        `)
-        .eq('conversation_id', conversationId);
-
-      if (error) throw error;
-
-      return data
-        ?.map(item => item.tags)
-        .filter((tag): tag is Tag => tag !== null) || [];
-    } catch (error: any) {
-      console.error('Error fetching conversation tags:', error);
-      return [];
-    }
-  },
-
-  fetchTags: async () => {
-    set({ isLoading: true, error: null });
-    try {
-      const { data, error } = await supabase
-        .from('tags')
-        .select('*')
-        .order('name');
-
-      if (error) throw error;
-      set({ tags: data || [] });
-    } catch (error: any) {
-      set({ error: error.message });
-      toast.error('Failed to fetch tags');
     } finally {
       set({ isLoading: false });
     }
@@ -187,8 +163,31 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         currentConversation: conversation ? { ...conversation, tags } : null
       });
     } catch (error: any) {
+      console.error('Error fetching messages:', error);
       set({ error: error.message });
       toast.error('Failed to fetch messages');
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  fetchTags: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const { data, error } = await supabase
+        .from('tags')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      set({ tags: data || [] });
+    } catch (error: any) {
+      console.error('Error fetching tags:', error);
+      set({ error: error.message });
+      toast.error('Failed to fetch tags');
     } finally {
       set({ isLoading: false });
     }
@@ -220,6 +219,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
 
       await get().fetchMessages(conversationId);
     } catch (error: any) {
+      console.error('Error sending message:', error);
       set({ error: error.message });
       toast.error('Failed to send message');
     } finally {
@@ -228,6 +228,11 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
   },
 
   createConversation: async (title?: string) => {
+    const { currentDomainId } = get();
+    if (!currentDomainId) {
+      throw new Error('No domain selected');
+    }
+
     set({ isLoading: true, error: null });
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -238,6 +243,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         .insert({
           title,
           user_id: user.id,
+          domain_id: currentDomainId,
           last_message_at: new Date().toISOString()
         })
         .select()
@@ -249,6 +255,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       await get().fetchConversations();
       return data.id;
     } catch (error: any) {
+      console.error('Error creating conversation:', error);
       set({ error: error.message });
       toast.error('Failed to create conversation');
       throw error;
@@ -268,6 +275,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       if (error) throw error;
       await get().fetchConversations();
     } catch (error: any) {
+      console.error('Error updating conversation:', error);
       set({ error: error.message });
       toast.error('Failed to update conversation');
     } finally {
@@ -287,6 +295,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       await get().fetchMessages(conversationId);
       await get().fetchConversations();
     } catch (error: any) {
+      console.error('Error adding tag:', error);
       set({ error: error.message });
       toast.error('Failed to add tag');
     } finally {
@@ -308,6 +317,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       await get().fetchMessages(conversationId);
       await get().fetchConversations();
     } catch (error: any) {
+      console.error('Error removing tag:', error);
       set({ error: error.message });
       toast.error('Failed to remove tag');
     } finally {
@@ -315,34 +325,48 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     }
   },
 
+  fetchConversationTags: async (conversationId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('conversation_tags')
+        .select(`
+          tags (
+            id,
+            name,
+            color
+          )
+        `)
+        .eq('conversation_id', conversationId);
+
+      if (error) throw error;
+
+      return data
+        ?.map(item => item.tags)
+        .filter((tag): tag is Tag => tag !== null) || [];
+    } catch (error: any) {
+      console.error('Error fetching conversation tags:', error);
+      return [];
+    }
+  },
+
   createTag: async (name: string, color: string) => {
     set({ isLoading: true, error: null });
     try {
-      console.log('Attempting to create tag:', { name, color });
-
-      // Check if user is authenticated
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      // Create the tag
       const { data, error } = await supabase
         .from('tags')
         .insert([{ name, color }])
         .select()
         .single();
 
-      if (error) {
-        console.error('Error creating tag:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      console.log('Created tag:', data);
-
-      // Refresh the tags list
       await get().fetchTags();
       toast.success('Tag created successfully');
     } catch (error: any) {
-      console.error('Create tag error:', error);
+      console.error('Error creating tag:', error);
       set({ error: error.message });
       toast.error('Failed to create tag: ' + error.message);
     } finally {
@@ -353,38 +377,19 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
   deleteTag: async (id: string) => {
     set({ isLoading: true, error: null });
     try {
-      console.log('Attempting to delete tag:', id);
-
-      // First, let's check if the tag exists
-      const { data: tagCheck } = await supabase
-        .from('tags')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      console.log('Tag to delete:', tagCheck);
-
-      // Delete from tags table first
-      const { data: deleteResult, error: tagError } = await supabase
+      const { error } = await supabase
         .from('tags')
         .delete()
-        .eq('id', id)
-        .select();
+        .eq('id', id);
 
-      if (tagError) {
-        console.error('Error deleting tag:', tagError);
-        throw tagError;
-      }
+      if (error) throw error;
 
-      console.log('Delete result:', deleteResult);
-
-      // Refresh the tags list
       await get().fetchTags();
       await get().fetchConversations();
       
       toast.success('Tag deleted successfully');
     } catch (error: any) {
-      console.error('Delete tag error:', error);
+      console.error('Error deleting tag:', error);
       set({ error: error.message });
       toast.error('Failed to delete tag: ' + error.message);
     } finally {
