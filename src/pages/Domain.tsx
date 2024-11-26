@@ -1,11 +1,24 @@
-{/* Previous imports remain the same */}
 import React, { useState, useEffect, useRef } from 'react';
-import { Copy, Check, Code2, Globe, Save } from 'lucide-react';
-import { HexColorPicker } from 'react-colorful';
+import { Save } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useDomain } from '../context/DomainContext';
-import ChatbotPreview from '../components/ChatbotPreview';
 import { supabase } from '../lib/supabase';
+import type { FAQ } from '../types/faq';
+import type { TrainingData } from '../types/trainingData';
+import ChatbotPreview from '../components/ChatbotPreview';
+import DomainHeader from '../components/domain/DomainHeader';
+import IntegrationCode from '../components/domain/IntegrationCode';
+import ChatbotSettings from '../components/domain/ChatbotSettings';
+import FAQSection from '../components/domain/FAQSection';
+import TrainingSection from '../components/domain/TrainingSection';
+
+interface DomainSettings {
+  chatbot_name: string;
+  greeting_message: string;
+  color: string;
+  header_text_color: string;
+  primary_color: string;
+}
 
 export default function Domain() {
   const { currentDomain, updateDomainName } = useDomain();
@@ -16,23 +29,18 @@ export default function Domain() {
   const [greetingMessage, setGreetingMessage] = useState('👋 Hi there! How can I help you today?');
   const [domainName, setDomainName] = useState(currentDomain?.name || '');
   const [isEditing, setIsEditing] = useState(false);
-  const [qaList, setQaList] = useState([
-    { id: 1, question: "What are your business hours?", answer: "We're open Monday to Friday, 9 AM to 5 PM." },
-    { id: 2, question: "How can I contact support?", answer: "You can reach us at support@example.com" }
-  ]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [trainingData, setTrainingData] = useState([
-    { id: 1, content: "The company was founded in 2020 and specializes in AI solutions.", type: "context" },
-    { id: 2, content: "Our product pricing starts at $99/month for the basic plan.", type: "context" }
-  ]);
+
+  const [trainingData, setTrainingData] = useState<TrainingData[]>([]);
   const [newTrainingData, setNewTrainingData] = useState('');
   const [trainingSearchQuery, setTrainingSearchQuery] = useState('');
-  const [editingTrainingId, setEditingTrainingId] = useState<number | null>(null);
+
+  const [qaList, setQaList] = useState<FAQ[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [newQuestion, setNewQuestion] = useState('');
   const [newAnswer, setNewAnswer] = useState('');
   const [headerTextColor, setHeaderTextColor] = useState('#000000');
   const [showHeaderColorPicker, setShowHeaderColorPicker] = useState(false);
+  const [primaryColor, setPrimaryColor] = useState('#FF6B00');
 
   const colorPickerRef = useRef<HTMLDivElement>(null);
   const headerColorPickerRef = useRef<HTMLDivElement>(null);
@@ -41,30 +49,56 @@ export default function Domain() {
     setDomainName(currentDomain?.name || '');
   }, [currentDomain?.name]);
 
-  // Fetch chatbot settings when domain changes
   useEffect(() => {
-    const fetchChatbotSettings = async () => {
+    const fetchFAQs = async () => {
+      if (!currentDomain?.id) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('faqs')
+          .select('*')
+          .eq('domain_id', currentDomain.id)
+          .order('created_at', { ascending: true });
+
+        if (error) throw error;
+        setQaList(data || []);
+      } catch (error) {
+        console.error('Error fetching FAQs:', error);
+        toast.error('Failed to load FAQs');
+      }
+    };
+
+    fetchFAQs();
+  }, [currentDomain?.id]);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
       if (!currentDomain?.id) return;
 
       try {
         const { data, error } = await supabase
           .from('domain_settings')
-          .select('chatbot_name')
+          .select('*')
           .eq('domain_id', currentDomain.id)
           .single();
 
-        if (error) throw error;
+        if (error && error.code !== 'PGRST116') throw error;
 
         if (data) {
-          setChatbotName(data.chatbot_name || 'Friendly Assistant');
+          const settings = data as DomainSettings;
+          setChatbotName(settings.chatbot_name || 'Friendly Assistant');
+          setGreetingMessage(settings.greeting_message || '👋 Hi there! How can I help you today?');
+          setColor(settings.primary_color || '#FF6B00');
+          setHeaderTextColor(settings.header_text_color || '#000000');
+          setPrimaryColor(settings.primary_color || '#FF6B00');
         }
       } catch (error) {
-        console.error('Error fetching chatbot settings:', error);
-        toast.error('Failed to load chatbot settings');
+        console.error('Error fetching settings:', error);
+        toast.error('Failed to load settings');
       }
     };
 
-    fetchChatbotSettings();
+    fetchSettings();
   }, [currentDomain?.id]);
 
   useEffect(() => {
@@ -113,6 +147,52 @@ export default function Domain() {
     toast.success('Domain name updated successfully');
   };
 
+  const handleAddQA = async () => {
+    if (!newQuestion.trim() || !newAnswer.trim() || !currentDomain?.id) {
+      toast.error('Both question and answer are required');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('faqs')
+        .insert({
+          question: newQuestion.trim(),
+          answer: newAnswer.trim(),
+          domain_id: currentDomain.id
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setQaList([...qaList, data]);
+      setNewQuestion('');
+      setNewAnswer('');
+      toast.success('FAQ added successfully');
+    } catch (error) {
+      console.error('Error adding FAQ:', error);
+      toast.error('Failed to add FAQ');
+    }
+  };
+
+  const handleDeleteQA = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('faqs')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setQaList(qaList.filter(qa => qa.id !== id));
+      toast.success('FAQ deleted successfully');
+    } catch (error) {
+      console.error('Error deleting FAQ:', error);
+      toast.error('Failed to delete FAQ');
+    }
+  };
+
   const handleSaveAll = async () => {
     if (!currentDomain?.id) {
       toast.error('No domain selected');
@@ -131,7 +211,6 @@ export default function Domain() {
     }
 
     try {
-      // Update domain settings
       const { error: settingsError } = await supabase
         .from('domain_settings')
         .upsert({
@@ -139,7 +218,8 @@ export default function Domain() {
           chatbot_name: chatbotName,
           greeting_message: greetingMessage,
           color: color,
-          header_text_color: headerTextColor
+          header_text_color: headerTextColor,
+          primary_color: primaryColor
         });
 
       if (settingsError) throw settingsError;
@@ -153,39 +233,71 @@ export default function Domain() {
     }
   };
 
-  // Rest of the component remains the same...
-  const handleAddQA = () => {
-    if (!newQuestion.trim() || !newAnswer.trim()) {
-      toast.error('Both question and answer are required');
+  const handleAddTrainingData = async () => {
+    if (!newTrainingData.trim() || !currentDomain?.id) {
+      toast.error('Training data cannot be empty');
       return;
     }
 
-    setQaList([
-      ...qaList,
-      {
-        id: Date.now(),
-        question: newQuestion.trim(),
-        answer: newAnswer.trim()
+    try {
+      const { data, error } = await supabase
+        .from('training_data')
+        .insert({
+          content: newTrainingData.trim(),
+          domain_id: currentDomain.id
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setTrainingData([...trainingData, data]);
+      setNewTrainingData('');
+      toast.success('Training data added successfully');
+    } catch (error) {
+      console.error('Error adding training data:', error);
+      toast.error('Failed to add training data');
+    }
+  };
+
+  const handleDeleteTrainingData = async (id: number | string) => {
+    try {
+      const { error } = await supabase
+        .from('training_data')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setTrainingData(trainingData.filter(item => item.id !== id));
+      toast.success('Training data removed successfully');
+    } catch (error) {
+      console.error('Error deleting training data:', error);
+      toast.error('Failed to delete training data');
+    }
+  };
+
+  useEffect(() => {
+    const fetchTrainingData = async () => {
+      if (!currentDomain?.id) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('training_data')
+          .select('*')
+          .eq('domain_id', currentDomain.id);
+
+        if (error) throw error;
+
+        setTrainingData(data || []);
+      } catch (error) {
+        console.error('Error fetching training data:', error);
+        toast.error('Failed to load training data');
       }
-    ]);
-    setNewQuestion('');
-    setNewAnswer('');
-    toast.success('FAQ added successfully');
-  };
+    };
 
-  const handleDeleteQA = (id: number) => {
-    setQaList(qaList.filter(qa => qa.id !== id));
-    toast.success('FAQ deleted successfully');
-  };
-
-  const filteredQA = qaList.filter(qa => 
-    qa.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    qa.answer.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const filteredTrainingData = trainingData.filter(data => 
-    data.content.toLowerCase().includes(trainingSearchQuery.toLowerCase())
-  );
+    fetchTrainingData();
+  }, [currentDomain?.id]);
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -199,353 +311,73 @@ export default function Domain() {
       <div className="space-y-8">
         {/* Domain Settings Section */}
         <section>
-          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-            <Globe className="h-5 w-5 text-gray-600" />
-            Domain Settings
-          </h2>
-          
+          <h2 className="text-xl font-semibold mb-4">Domain Settings</h2>
           <div className="bg-white rounded-lg shadow">
-            {/* Domain Name */}
-            <div className="p-6 border-b">
-              <h3 className="text-lg font-semibold mb-4">Domain Name</h3>
-              <div className="flex items-center gap-3">
-                <Globe className="h-5 w-5 text-gray-500 flex-shrink-0" />
-                {isEditing ? (
-                  <div className="flex-1 flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={domainName}
-                      onChange={(e) => setDomainName(e.target.value)}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                      placeholder="Enter domain name"
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        onClick={handleDomainSave}
-                        className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2"
-                      >
-                        <Save className="h-4 w-4" />
-                        Save
-                      </button>
-                      <button
-                        onClick={() => {
-                          setDomainName(currentDomain?.name || '');
-                          setIsEditing(false);
-                        }}
-                        className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex-1 flex items-center justify-between">
-                    <span className="font-medium text-gray-700">{domainName}</span>
-                    <button
-                      onClick={() => setIsEditing(true)}
-                      className="text-orange-500 hover:text-orange-600 transition-colors"
-                    >
-                      Edit
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Integration Code */}
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Integration Code</h3>
-                <Code2 className="h-5 w-5 text-gray-500" />
-              </div>
-              <div className="bg-gray-50 p-4 rounded-lg font-mono text-sm relative">
-                <pre className="overflow-x-auto">{integrationCode}</pre>
-                <button
-                  onClick={handleCopyCode}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 bg-gray-900 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-gray-800 transition-colors"
-                >
-                  {copied ? (
-                    <>
-                      <Check className="h-4 w-4" />
-                      Copied!
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-4 w-4" />
-                      Copy Code
-                    </>
-                  )}
-                </button>
-              </div>
-              <p className="mt-4 text-sm text-gray-600">
-                Add this code snippet to your website's HTML just before the closing &lt;/body&gt; tag
-              </p>
-            </div>
+            <DomainHeader
+              isEditing={isEditing}
+              domainName={domainName}
+              setDomainName={setDomainName}
+              handleDomainSave={handleDomainSave}
+              setIsEditing={setIsEditing}
+              currentDomain={currentDomain}
+            />
+            <IntegrationCode
+              integrationCode={integrationCode}
+              copied={copied}
+              handleCopyCode={handleCopyCode}
+            />
           </div>
         </section>
 
         {/* Chatbot Settings Section */}
         <section>
           <h2 className="text-xl font-semibold mb-4">Chatbot Settings</h2>
-          
-          <div className="space-y-6">
-            {/* Chatbot Name */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold mb-4">Chatbot Name</h3>
-              <div className="max-w-md">
-                <input
-                  type="text"
-                  value={chatbotName}
-                  onChange={(e) => setChatbotName(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  placeholder="Enter chatbot name"
-                />
-                <p className="mt-2 text-sm text-gray-600">
-                  This name will be displayed to your website visitors
-                </p>
-              </div>
-            </div>
-
-            {/* Welcome Message */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold mb-4">Welcome Message</h3>
-              <div className="max-w-md">
-                <textarea
-                  value={greetingMessage}
-                  onChange={(e) => setGreetingMessage(e.target.value)}
-                  rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
-                  placeholder="Enter the greeting message"
-                />
-                <p className="mt-2 text-sm text-gray-600">
-                  This message will be shown when a visitor first opens the chat. You can use emojis! 😊
-                </p>
-              </div>
-            </div>
-
-            {/* Chatbot Color */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold mb-4">Chatbot Color</h3>
-              <div className="relative" ref={colorPickerRef}>
-                <div className="flex items-center gap-4 mb-4">
-                  <button
-                    onClick={() => setShowColorPicker(!showColorPicker)}
-                    className="w-10 h-10 rounded-lg border shadow-sm"
-                    style={{ backgroundColor: color }}
-                  />
-                  <input
-                    type="text"
-                    value={color}
-                    onChange={(e) => setColor(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    placeholder="Enter color code (e.g., #FF6B00)"
-                  />
-                </div>
-                {showColorPicker && (
-                  <div className="absolute z-10">
-                    <HexColorPicker color={color} onChange={setColor} />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Header Text Color */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold mb-4">Header Text Color</h3>
-              <div className="relative" ref={headerColorPickerRef}>
-                <div className="flex items-center gap-4 mb-4">
-                  <button
-                    onClick={() => setShowHeaderColorPicker(!showHeaderColorPicker)}
-                    className="w-10 h-10 rounded-lg border shadow-sm"
-                    style={{ backgroundColor: headerTextColor }}
-                  />
-                  <input
-                    type="text"
-                    value={headerTextColor}
-                    onChange={(e) => setHeaderTextColor(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    placeholder="Enter header text color code (e.g., #000000)"
-                  />
-                </div>
-                {showHeaderColorPicker && (
-                  <div className="absolute z-10">
-                    <HexColorPicker color={headerTextColor} onChange={setHeaderTextColor} />
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+          <ChatbotSettings
+            chatbotName={chatbotName}
+            setChatbotName={setChatbotName}
+            greetingMessage={greetingMessage}
+            setGreetingMessage={setGreetingMessage}
+            color={color}
+            setColor={setColor}
+            showColorPicker={showColorPicker}
+            setShowColorPicker={setShowColorPicker}
+            headerTextColor={headerTextColor}
+            setHeaderTextColor={setHeaderTextColor}
+            showHeaderColorPicker={showHeaderColorPicker}
+            setShowHeaderColorPicker={setShowHeaderColorPicker}
+            colorPickerRef={colorPickerRef}
+            headerColorPickerRef={headerColorPickerRef}
+          />
         </section>
 
         {/* Help Desk Section */}
         <section>
           <h2 className="text-xl font-semibold mb-4">Help Desk</h2>
-          <div className="grid grid-cols-2 gap-6">
-            {/* Left side - Input Form */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <p className="text-gray-600 mb-6">
-                Set up FAQs for your chatbot to answer common questions
-              </p>
-              
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="question" className="block text-sm font-medium text-gray-700 mb-1">
-                    Question
-                  </label>
-                  <input
-                    type="text"
-                    id="question"
-                    value={newQuestion}
-                    onChange={(e) => setNewQuestion(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    placeholder="Enter a question"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="answer" className="block text-sm font-medium text-gray-700 mb-1">
-                    Answer
-                  </label>
-                  <textarea
-                    id="answer"
-                    value={newAnswer}
-                    onChange={(e) => setNewAnswer(e.target.value)}
-                    rows={4}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
-                    placeholder="Enter the answer"
-                  />
-                </div>
-
-                <div className="flex justify-end">
-                  <button
-                    onClick={handleAddQA}
-                    className="bg-orange-500 text-white px-6 py-2 rounded-lg hover:bg-orange-600 transition-colors"
-                  >
-                    Add FAQ
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Right side - Q&A List */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="mb-4">
-                <input
-                  type="text"
-                  placeholder="Search questions and answers..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-
-              <div className="space-y-4 max-h-[400px] overflow-y-auto">
-                {filteredQA.map((qa) => (
-                  <div key={qa.id} className="border rounded-lg p-4 hover:border-orange-200 transition-colors">
-                    <div className="flex justify-between items-start mb-2">
-                      <h4 className="font-medium text-gray-900">{qa.question}</h4>
-                      <button
-                        onClick={() => handleDeleteQA(qa.id)}
-                        className="text-gray-400 hover:text-red-500"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                        </svg>
-                      </button>
-                    </div>
-                    <p className="text-sm text-gray-600">{qa.answer}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          <FAQSection
+            qaList={qaList}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            newQuestion={newQuestion}
+            setNewQuestion={setNewQuestion}
+            newAnswer={newAnswer}
+            setNewAnswer={setNewAnswer}
+            handleAddQA={handleAddQA}
+            handleDeleteQA={handleDeleteQA}
+          />
         </section>
 
         {/* Bot Training Section */}
         <section>
           <h2 className="text-xl font-semibold mb-4">Bot Training</h2>
-          <div className="grid grid-cols-2 gap-6">
-            {/* Left side - Input Form */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <p className="text-gray-600 mb-6">
-                Add training data to help your bot understand your business better. Include important information about your products, services, policies, and procedures.
-              </p>
-              
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="trainingData" className="block text-sm font-medium text-gray-700 mb-1">
-                    Training Data
-                  </label>
-                  <textarea
-                    id="trainingData"
-                    value={newTrainingData}
-                    onChange={(e) => setNewTrainingData(e.target.value)}
-                    rows={6}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
-                    placeholder="Enter information that will help the bot understand your business..."
-                  />
-                </div>
-
-                <div className="flex justify-end">
-                  <button
-                    onClick={() => {
-                      if (newTrainingData.trim()) {
-                        setTrainingData([...trainingData, {
-                          id: Date.now(),
-                          content: newTrainingData.trim(),
-                          type: 'context'
-                        }]);
-                        setNewTrainingData('');
-                        toast.success('Training data added successfully');
-                      }
-                    }}
-                    className="bg-orange-500 text-white px-6 py-2 rounded-lg hover:bg-orange-600 transition-colors"
-                  >
-                    Add Training Data
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Right side - Training Data List */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="mb-4">
-                <input
-                  type="text"
-                  placeholder="Search training data..."
-                  value={trainingSearchQuery}
-                  onChange={(e) => setTrainingSearchQuery(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-
-              <div className="space-y-4 max-h-[400px] overflow-y-auto">
-                {filteredTrainingData.map((data) => (
-                  <div key={data.id} className="border rounded-lg p-4 hover:border-orange-200 transition-colors">
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="px-2 py-1 bg-gray-100 rounded-md text-xs text-gray-600">
-                          {data.type}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => {
-                          setTrainingData(trainingData.filter(item => item.id !== data.id));
-                          toast.success('Training data removed');
-                        }}
-                        className="text-gray-400 hover:text-red-500"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                        </svg>
-                      </button>
-                    </div>
-                    <p className="text-sm text-gray-600 whitespace-pre-wrap">{data.content}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          <TrainingSection
+            trainingData={trainingData}
+            trainingSearchQuery={trainingSearchQuery}
+            setTrainingSearchQuery={setTrainingSearchQuery}
+            newTrainingData={newTrainingData}
+            setNewTrainingData={setNewTrainingData}
+            handleAddTrainingData={handleAddTrainingData}
+            handleDeleteTrainingData={handleDeleteTrainingData}
+          />
         </section>
 
         {/* Save Button */}
