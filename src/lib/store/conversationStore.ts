@@ -51,6 +51,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     set({ currentDomainId: domainId });
     if (domainId) {
       get().fetchConversations();
+      get().fetchTags(); // Fetch tags when domain changes
     }
   },
 
@@ -172,6 +173,12 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
   },
 
   fetchTags: async () => {
+    const { currentDomainId } = get();
+    if (!currentDomainId) {
+      set({ tags: [] });
+      return;
+    }
+
     set({ isLoading: true, error: null });
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -180,6 +187,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       const { data, error } = await supabase
         .from('tags')
         .select('*')
+        .eq('domain_id', currentDomainId)
         .order('name');
 
       if (error) throw error;
@@ -350,6 +358,11 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
   },
 
   createTag: async (name: string, color: string) => {
+    const { currentDomainId } = get();
+    if (!currentDomainId) {
+      throw new Error('No domain selected');
+    }
+
     set({ isLoading: true, error: null });
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -357,7 +370,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
 
       const { data, error } = await supabase
         .from('tags')
-        .insert([{ name, color }])
+        .insert([{ name, color, domain_id: currentDomainId }])
         .select()
         .single();
 
