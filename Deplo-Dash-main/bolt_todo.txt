@@ -1,0 +1,22 @@
+1)Build Front End
+2)Build Backend
+
+Todo:
+
+Dashboard:
+
+Conversations:
+
+Domain:
+
+Backend:
+-connect full auth system with clerk or supabase ( use supabase for all backend its good)
+-create full live chat system
+-implement database for everything 
+-make bot integrator work
+-
+
+
+Remaining Pages Later
+
+git remote add origin https://github.com/abdulmls2/sb1-xd2btc
