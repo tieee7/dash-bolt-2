@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Amazing Website</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Header -->
+    <header class="bg-gray-900 text-white py-6">
+        <div class="container mx-auto px-6">
+            <h1 class="text-3xl font-bold">My Company</h1>
+            <p class="mt-2">Providing amazing solutions since 202400</p>
+        </div>
+    </header>
+
+    <!-- Load React and ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <link href="https://deplo-dash.vercel.app/widget/style.css" rel="stylesheet">
+
+    <!-- Chatbot Integration -->
+    <script>
+        window.CHATBOT_CONFIG = {
+            domainId: "4b32ec2c-b40b-43f5-a0e1-1133ea069f41", // Replace with your actual domain ID
+            apiBaseUrl: "https://deplo-dash.vercel.app/api" // Add your API base URL
+        };
+    </script>
+    <script src="https://deplo-dash.vercel.app/widget/chatbot-widget.umd.js"></script>
+</body>
+</html>
