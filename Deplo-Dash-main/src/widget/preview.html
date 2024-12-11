@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot Widget Preview</title>
+</head>
+<body>
+    <div class="container" style="max-width: 800px; margin: 40px auto; padding: 20px;">
+        <h1 style="margin-bottom: 20px;">Chatbot Widget Preview</h1>
+        <p>This is a preview page showing how your chatbot widget will appear on your website.</p>
+        <p>The chatbot widget should appear in the bottom-right corner of this page.</p>
+    </div>
+
+    <script>
+        // Get domainId from URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        window.CHATBOT_CONFIG = {
+            domainId: urlParams.get('domainId') || '',
+        };
+    </script>
+    <script src="/chatbot-widget.umd.js"></script>
+</body>
+</html>
